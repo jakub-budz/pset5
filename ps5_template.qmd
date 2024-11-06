@@ -1,24 +1,13 @@
 ---
-title: "title"
-author: "author"
-date: "date"
-format: 
+title: "PSET5: Webscraping"
+author: "Jakub Budz & Charles Huang"
+date: "November 9, 2024"
+format:
   pdf:
-    include-in-header: 
-       text: |
-         \usepackage{fvextra}
-         \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
-include-before-body:
-  text: |
-    \RecustomVerbatimEnvironment{verbatim}{Verbatim}{
-      showspaces = false,
-      showtabs = false,
-      breaksymbolleft={},
-      breaklines
-    }
-output:
-  echo: false
-  eval: false
+    code-overflow: wrap
+execute:
+  eval: true 
+  echo: true
 ---
 
 **Due 11/9 at 5:00PM Central. Worth 100 points + 10 points extra credit.**
@@ -26,12 +15,12 @@ output:
 ## Submission Steps (10 pts)
 1. This problem set is a paired problem set.
 2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
-    - Partner 1 (name and cnet ID):
-    - Partner 2 (name and cnet ID):
+    - Partner 1 (Jakub Budz jbudz1):
+    - Partner 2 (Charles Huang chuang2):
 3. Partner 1 will accept the `ps5` and then share the link it creates with their partner. You can only share it with one partner so you will not be able to change it after your partner has accepted. 
-4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_\_\*\* \*\*\_\_\*\*
+4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_JB\_\*\* \*\*\_CH\_\*\*
 5. "I have uploaded the names of anyone else other than my partner and I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  (1 point)
-6. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
+6. Late coins used this pset: \*\*\_0\_\*\* Late coins left after submission: \*\*\_JB:2, CH:1\_\*\*
 7. Knit your `ps5.qmd` to an PDF file to make `ps5.pdf`, 
     * The PDF should not be more than 25 pages. Use `head()` and re-size figures when appropriate. 
 8. (Partner 1): push  `ps5.qmd` and `ps5.pdf` to your github repo.
@@ -44,25 +33,68 @@ output:
 import pandas as pd
 import altair as alt
 import time
-
+from bs4 import BeautifulSoup
+import requests
 import warnings 
 warnings.filterwarnings('ignore')
-alt.renderers.enable("png")
 ```
-
 
 ## Step 1: Develop initial scraper and crawler
 
 ### 1. Scraping (PARTNER 1)
 
-```{python}
+Title of the enforcement action
+Date
+Category (e.g, “Criminal and Civil Actions”)
+Link associated with the enforcement action
 
+```{python}
+# Import url into soup object
+url = 'https://oig.hhs.gov/fraud/enforcement'
+response = requests.get(url)
+soup = BeautifulSoup(response.text, 'lxml')
 ```
 
-  
+```{python}
+# Create df
+# Attribution: ChatGPT was used to get general understanding of classes & bs4
+# functions. With, I was able to pull all of the enforcement actions into an
+# object "actions," which made the scraping function much easier to apply.
+data = []
+actions = soup.find_all(
+    'li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+for action in actions:
+# Title
+    title_tag = action.find('h2', class_='usa-card__heading')
+    title = title_tag.get_text(strip=True) if title_tag else None
+# Date
+    date_tag = action.find('span', class_='text-base-dark')
+    date = date_tag.get_text(strip=True) if date_tag else None
+# Category
+    category_tag = action.find(
+        'li', class_='display-inline-block usa-tag text-no-lowercase text-base-darkest bg-base-lightest margin-right-1')
+    category = category_tag.get_text(strip=True) if category_tag else None
+# Link
+    link = title_tag.find(
+        'a')['href'] if title_tag and title_tag.find('a') else None
+    if link and not link.startswith("http"):
+        link = "https://oig.hhs.gov" + link
+    data.append({
+        'Title': title,
+        'Date': date,
+        'Category': category,
+        'Link': link
+    })
+oig_data = pd.DataFrame(data)
+```
+
 ### 2. Crawling (PARTNER 1)
 
 ```{python}
+# Scrape and add in agency name
+
+def retrieve_agency(url):
+  
 
 ```
 
