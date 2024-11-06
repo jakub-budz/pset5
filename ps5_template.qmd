@@ -86,16 +86,31 @@ for action in actions:
         'Link': link
     })
 oig_data = pd.DataFrame(data)
+print(oig_data.head())
 ```
 
 ### 2. Crawling (PARTNER 1)
 
 ```{python}
-# Scrape and add in agency name
+# Define function that captures Agency names
+# Attribution: ChatGPT assisted with the text stripping
+# Also used StackOverflow for general guidance:
+# https://stackoverflow.com/questions/68076739/
+# creating-a-function-for-my-python-web-scraper-that-will-output-a-dictionary
+def retrieve_agency(link):
+    response = requests.get(link)
+    soup = BeautifulSoup(response.text, 'lxml')
+    li_tags = soup.find_all('li')
 
-def retrieve_agency(url):
-  
+    for li in li_tags:
+        span_tag = li.find('span', class_='padding-right-2 text-base')
+        if span_tag and span_tag.text.strip() == "Agency:":
+            agency_name = li.get_text(
+                strip=True).replace("Agency:", "").strip()
+            return agency_name
 
+oig_data['Agency Name'] = oig_data['Link'].apply(lambda x: retrieve_agency(x))
+print(oig_data.head())
 ```
 
 ## Step 2: Making the scraper dynamic
