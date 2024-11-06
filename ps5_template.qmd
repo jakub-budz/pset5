@@ -36,6 +36,7 @@ import time
 from bs4 import BeautifulSoup
 import requests
 import warnings 
+import lxml
 warnings.filterwarnings('ignore')
 ```
 
@@ -52,7 +53,7 @@ Link associated with the enforcement action
 # Import url into soup object
 url = 'https://oig.hhs.gov/fraud/enforcement'
 response = requests.get(url)
-soup = BeautifulSoup(response.text, 'html.parser')
+soup = BeautifulSoup(response.text, 'lxml')
 ```
 
 ```{python}
