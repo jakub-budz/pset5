@@ -52,7 +52,7 @@ Link associated with the enforcement action
 # Import url into soup object
 url = 'https://oig.hhs.gov/fraud/enforcement'
 response = requests.get(url)
-soup = BeautifulSoup(response.text, 'lxml')
+soup = BeautifulSoup(response.text, 'html.parser')
 ```
 
 ```{python}
