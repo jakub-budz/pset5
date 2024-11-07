@@ -120,7 +120,6 @@ print(oig_data.head())
 
 * a. Pseudo-Code (PARTNER 2)
 
-
 Turning the scraper into a function: You will write a function that takes as input a month and a year, and then pulls and formats the enforcement actions like in Step 1 starting from that month+year to today.
 
 • This function should first check that the year inputted >= 2013 before starting to scrape. If the year inputted < 2013, it should print a statement reminding the user to restrict to year >= 2013, since only enforcement actions after 2013 are listed.
@@ -161,9 +160,6 @@ def scraper_year_check(month, year):
         convert my_data into a dataframe called oig_dataframe
         oig_dataframe.to_csv(f"enforcement_actions_{year}_{month}.csv")
 
-    
-
-
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
@@ -183,12 +179,14 @@ def scraper_year_check(month, year):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
 
-        li_tags = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+        li_tags = soup.find_all(
+            'li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
 
         data_found = False
 
         for li in li_tags:
-            date_text = li.find('span', class_="text-base-dark padding-right-105").get_text(strip=True) if li.find('span', class_='text-base-dark padding-right-105') else None
+            date_text = li.find('span', class_="text-base-dark padding-right-105").get_text(
+                strip=True) if li.find('span', class_='text-base-dark padding-right-105') else None
 
             if date_text:
                 date_object = datetime.strptime(date_text, "%B %d, %Y")
@@ -198,15 +196,17 @@ def scraper_year_check(month, year):
                     filename = f"enforcement_actions_{year}_{month}.csv"
                     oig_data.to_csv(filename, index=False)
                     print(f"Data saved to {filename}")
-                    return 
+                    return
 
                 data_found = True
 
-                title = li.find('h2', class_="usa-card__heading").get_text(strip=True) if li.find('h2') else None
-                category = li.find('li', class_='display-inline-block').get_text(strip=True) if li.find('li', class_='display-inline-block') else None
+                title = li.find(
+                    'h2', class_="usa-card__heading").get_text(strip=True) if li.find('h2') else None
+                category = li.find('li', class_='display-inline-block').get_text(
+                    strip=True) if li.find('li', class_='display-inline-block') else None
                 link = li.find('a')['href'] if li.find('a') else None
                 if link and not link.startswith("http"):
-                    link = "https://oig.hhs.gov" + link 
+                    link = "https://oig.hhs.gov" + link
 
                 my_data.append({
                     'Title': title,
@@ -214,22 +214,26 @@ def scraper_year_check(month, year):
                     'Category': category,
                     'Link': link
                 })
-        #stop the loop if no data found
+        # stop the loop if no data found
         if not data_found:
-            break 
+            break
 
         time.sleep(1)
 
         current_page += 1
 
-scraper_year_check(5, 2023)
-
+scraper_year_check(1, 2023)
 ```
 
 * c. Test Partner's Code (PARTNER 1)
 
 ```{python}
-
+scraper_year_check(1, 2021)
+oig_2021 = pd.read_csv('enforcement_actions_2021_1.csv')
+oig_2021['Agency Name'] = oig_2021['Link'].apply(lambda x: retrieve_agency(x))
+print(f'There are {len(oig_2021)} observations since 2021.')
+oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
+print(oig_2021.loc[oig_2021['Date'].idxmin()])
 ```
 
 ## Step 3: Plot data based on scraped data
