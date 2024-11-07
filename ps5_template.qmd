@@ -184,12 +184,12 @@ def scraper_year_check(month, year):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
 
-        li_tags = soup.find_all('li', class='usa-card card--list pep-card--minimal mobile:grid-col-12')
+        li_tags = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
 
         data_found = False
 
         for li in li_tags:
-            date_text = li.find('span', class="text-base-dark padding-right-105").get_text(strip=True) if li.find('span', class='text-base-dark padding-right-105') else None
+            date_text = li.find('span', class_="text-base-dark padding-right-105").get_text(strip=True) if li.find('span', class_='text-base-dark padding-right-105') else None
 
             if date_text:
                 date_object = datetime.strptime(date_text, "%B %d, %Y")
@@ -203,11 +203,11 @@ def scraper_year_check(month, year):
 
                 data_found = True
 
-                title = li.find('h2', ,class="usa-card__heading").get_text(strip=True) if li.find('h2') else None
-                category = li.find('li', class='display-inline-block')get_text(strip=True) if li.find('li', class='display-inline-block') else None
+                title = li.find('h2', class_="usa-card__heading").get_text(strip=True) if li.find('h2') else None
+                category = li.find('li', class_='display-inline-block').get_text(strip=True) if li.find('li', class_='display-inline-block') else None
                 link = li.find('a')['href'] if li.find('a') else None
                 if link and not link.startswith("http"):
-                link = "https://oig.hhs.gov" + link 
+                    link = "https://oig.hhs.gov" + link 
 
                 my_data.append({
                     'Title': title,
@@ -223,11 +223,7 @@ def scraper_year_check(month, year):
 
         current_page += 1
 
-
-            
-
-
-
+scraper_year_check(1, 2023)
 
 ```
 
