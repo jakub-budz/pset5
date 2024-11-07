@@ -36,6 +36,7 @@ import time
 from bs4 import BeautifulSoup
 import requests
 import warnings 
+import lxml
 warnings.filterwarnings('ignore')
 ```
 
@@ -120,9 +121,109 @@ print(oig_data.head())
 * a. Pseudo-Code (PARTNER 2)
 
 
+Turning the scraper into a function: You will write a function that takes as input a month and a year, and then pulls and formats the enforcement actions like in Step 1 starting from that month+year to today.
+
+• This function should first check that the year inputted >= 2013 before starting to scrape. If the year inputted < 2013, it should print a statement reminding the user to restrict to year >= 2013, since only enforcement actions after 2013 are listed.
+• It should save the dataframe output into a .csv file named as “enforcement_actions_year_month.csv” (do not commit this file to git)
+• If you’re crawling multiple pages, always add 1 second wait before going to the next page to prevent potential server-side block. To implement this in Python, you may look up .sleep() function from time library.
+
+Before writing out your function, write down pseudo-code of the steps that
+your function will go through. If you use a loop, discuss what kind of loop you will use and how you will define it.
+
+def scraper_year_check(month, year):
+    if year < 2013:
+        print an error statement
+        return
+    else:
+        my_data = []
+        convert target month and year to a datetime object called target_date
+        set current_page = 1
+
+        while True (keep going until loop)
+            set URL to "https://oig.hhs.gov/fraud/enforcement/?page={current_page}"
+            soup = fetch the page and make a soup object
+            li_tags = use find_all on soup to collect all li tags
+            data_found = boolean track if entry matching the date range found
+
+            for each li in li_tags:
+                find the date from the span tag and set it to date_text
+                compare date_text to the target_date
+                if date_text < target date:
+                    break the while loop (done collecting data)
+
+                if loop not broken:
+
+                find title
+                find category
+                find link
+                append these to my_data as a dictionary
+                time.sleep(1) #pauses for 1 second to prevent server block
+                get the next page URL if available
+        convert my_data into a dataframe called oig_dataframe
+        oig_dataframe.to_csv(f"enforcement_actions_{year}_{month}.csv")
+
+    
+
+
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
+from datetime import datetime
+
+def scraper_year_check(month, year):
+    if year < 2013:
+        print("Year must be 2013 or later. Please enter a valid year.")
+        return
+
+    my_data = []
+    target_date = datetime(year, month, 1)
+    current_page = 1
+
+    while True:
+        url = f"https://oig.hhs.gov/fraud/enforcement/?page={current_page}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'lxml')
+
+        li_tags = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+
+        data_found = False
+
+        for li in li_tags:
+            date_text = li.find('span', class_="text-base-dark padding-right-105").get_text(strip=True) if li.find('span', class_='text-base-dark padding-right-105') else None
+
+            if date_text:
+                date_object = datetime.strptime(date_text, "%B %d, %Y")
+
+                if date_object < target_date:
+                    oig_data = pd.DataFrame(my_data)
+                    filename = f"enforcement_actions_{year}_{month}.csv"
+                    oig_data.to_csv(filename, index=False)
+                    print(f"Data saved to {filename}")
+                    return 
+
+                data_found = True
+
+                title = li.find('h2', class_="usa-card__heading").get_text(strip=True) if li.find('h2') else None
+                category = li.find('li', class_='display-inline-block').get_text(strip=True) if li.find('li', class_='display-inline-block') else None
+                link = li.find('a')['href'] if li.find('a') else None
+                if link and not link.startswith("http"):
+                    link = "https://oig.hhs.gov" + link 
+
+                my_data.append({
+                    'Title': title,
+                    'Date': date_text,
+                    'Category': category,
+                    'Link': link
+                })
+        #stop the loop if no data found
+        if not data_found:
+            break 
+
+        time.sleep(1)
+
+        current_page += 1
+
+scraper_year_check(1, 2023)
 
 ```
 
