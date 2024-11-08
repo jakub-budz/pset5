@@ -114,6 +114,8 @@ oig_data['Agency Name'] = oig_data['Link'].apply(lambda x: retrieve_agency(x))
 print(oig_data.head())
 ```
 
+
+
 ## Step 2: Making the scraper dynamic
 
 ### 1. Turning the scraper into a function 
@@ -236,11 +238,78 @@ oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
 print(oig_2021.loc[oig_2021['Date'].idxmin()])
 ```
 
+```{python}
+
+#Attribution: Used ChatGPT to figure out how to speed up the original code, since retrieve_agency was taking incredibly long. ChatGPT suggested using an asynchronous function with these associated packages, as well as turning off SSL checks (this is public non-sensitive data so should be OK.)
+
+import asyncio
+import aiohttp
+from bs4 import BeautifulSoup
+
+import nest_asyncio
+nest_asyncio.apply()
+
+import ssl
+import aiohttp
+
+# Create an SSL context to ignore verification
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+
+async def retrieve_agency_async(session, link):
+    async with session.get(link, ssl=ssl_context) as response:  # Disabling SSL verification here
+        html = await response.text()
+        soup = BeautifulSoup(html, 'lxml')
+        li_tags = soup.find_all('li')
+
+        for li in li_tags:
+            span_tag = li.find('span', class_='padding-right-2 text-base')
+            if span_tag and span_tag.text.strip() == "Agency:":
+                agency_name = li.get_text(strip=True).replace("Agency:", "").strip()
+                return agency_name
+    return None
+
+# Define a function to process all links asynchronously
+async def fetch_all_agencies(links):
+    async with aiohttp.ClientSession() as session:
+        tasks = [retrieve_agency_async(session, link) for link in links]
+        return await asyncio.gather(*tasks)
+
+# Use the asynchronous function in place of the original apply
+links = oig_2021['Link'].unique()  # Only unique links to avoid redundancy
+agency_names = asyncio.run(fetch_all_agencies(links))
+
+# Create a dictionary to map links to agency names for faster lookup
+agency_dict = dict(zip(links, agency_names))
+oig_2021['Agency Name'] = oig_2021['Link'].map(agency_dict)
+
+
+```
+
 ## Step 3: Plot data based on scraped data
 
 ### 1. Plot the number of enforcement actions over time (PARTNER 2)
 
+(Partner 2) Plot a line chart that shows: the number of enforcement actions over time (aggregated to each month+year) overall since January 2021.
+
 ```{python}
+
+import numpy as np
+
+oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
+
+oig_2021_summary = oig_2021.groupby(oig_2021['Date'].dt.to_period('M')).size().reset_index(name='Count')
+
+# Convert the 'Date' column back to datetime format
+oig_2021_summary['Date'] = oig_2021_summary['Date'].dt.to_timestamp()
+
+enf_actions = alt.Chart(oig_2021_summary).mark_line().encode(
+    x=alt.X('Date:T', axis=alt.Axis(format='%Y-%m', title='Date', labelAngle=-45)),
+    y=alt.Y('Count:Q', title='Count of Enforcement Actions')
+).properties(title="Monthly HHS Enforcement Actions from 2021 Onwards")
+enf_actions
+
 
 ```
 
