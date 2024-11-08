@@ -127,8 +127,7 @@ Turning the scraper into a function: You will write a function that takes as inp
 • It should save the dataframe output into a .csv file named as “enforcement_actions_year_month.csv” (do not commit this file to git)
 • If you’re crawling multiple pages, always add 1 second wait before going to the next page to prevent potential server-side block. To implement this in Python, you may look up .sleep() function from time library.
 
-Before writing out your function, write down pseudo-code of the steps that
-your function will go through. If you use a loop, discuss what kind of loop you will use and how you will define it.
+Before writing out your function, write down pseudo-code of the steps that your function will go through. If you use a loop, discuss what kind of loop you will use and how you will define it.
 
 def scraper_year_check(month, year):
     if year < 2013:
@@ -223,7 +222,7 @@ def scraper_year_check(month, year):
 
         current_page += 1
 
-scraper_year_check(1, 2023)
+scraper_year_check(5, 2023)
 
 ```
 
