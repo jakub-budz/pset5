@@ -232,10 +232,13 @@ scraper_year_check(1, 2023)
 ```{python}
 scraper_year_check(1, 2021)
 oig_2021 = pd.read_csv('enforcement_actions_2021_1.csv')
+
+'''
 oig_2021['Agency Name'] = oig_2021['Link'].apply(lambda x: retrieve_agency(x))
 print(f'There are {len(oig_2021)} observations since 2021.')
 oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
 print(oig_2021.loc[oig_2021['Date'].idxmin()])
+'''
 ```
 
 ```{python}
@@ -308,6 +311,7 @@ enf_actions = alt.Chart(oig_2021_summary).mark_line().encode(
     x=alt.X('Date:T', axis=alt.Axis(format='%Y-%m', title='Date', labelAngle=-45)),
     y=alt.Y('Count:Q', title='Count of Enforcement Actions')
 ).properties(title="Monthly HHS Enforcement Actions from 2021 Onwards")
+
 enf_actions
 
 
@@ -338,7 +342,88 @@ enf_actions
 
 ### 2. Map by District (PARTNER 2)
 
+Among actions taken by US Attorney District-level agencies, clean the district names so that you can merge them with the shapefile, and then plot a choropleth of the number of enforcement actions in each US Attorney District.
+Hint: look for “District” in the agency info.
+
+(We need to take the oig_2021 data and subset it to actions taken by US Attorney District level agencies only. Then clean the names and plot them with the shapefile data.)
+
 ```{python}
+import geopandas as gpd
+import re
+
+oig_2021_district = oig_2021[oig_2021['Agency Name'].str.contains('District', na=False)]
+district_data = gpd.read_file("/Users/charleshuang/Downloads/US Attorney Districts Shapefile simplified_20241108/geo_export_9d536c74-a84f-4bce-b9ee-76d1ad9c0104.shp")
+district_data.head()
+
+#Attribution: Used ChatGPT for help to clean the data. Searched for "how to clean text string so that it removes all text before a specified symbol such as a comma or colon". Used the split() function to do this
+
+def clean_agency(agency_name):
+    parts = re.split(r'[,:;]', agency_name)
+    return parts[-1].strip() if parts else agency_name
+
+oig_2021_district['Agency Name'] = oig_2021_district['Agency Name'].apply(clean_agency)
+
+#Need to group the data by district:
+
+district_counts = oig_2021_district.groupby('Agency Name').size().reset_index(name="Action Count")
+
+#Now we merge the district data with the shapefile:
+
+merged_districts = district_counts.merge(district_data, left_on="Agency Name", right_on="judicial_d", how='left')
+merged_districts = gpd.GeoDataFrame(merged_districts, geometry="geometry")
+
+
+```
+
+Finally we can plot the choropleth:
+
+```{python}
+import matplotlib.pyplot as plt
+
+
+fig, ax = plt.subplots(1, 1, figsize=(30, 25))
+merged_districts.plot(column="Action Count", cmap="Blues", legend=True, linewidth=0.8, edgecolor="0.8", ax=ax, legend_kwds={"shrink": 0.5})
+ax.set_axis_off()
+ax.set_aspect('equal')
+
+ax.set_title("Number of Actions per Judicial District", fontsize=16, pad=20)
+
+plt.show()
+
+``` 
+
+
+```{python}
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+
+# Plot with adjusted legend settings
+merged_districts.plot(
+    column="Action Count",
+    cmap="Blues",
+    linewidth=0.8,
+    edgecolor="0.8",
+    ax=ax,
+    legend=True,
+    legend_kwds={
+        "shrink": 0.5,       
+        "orientation": "vertical"
+    }
+)
+
+# Set xlim and ylim to focus on the contiguous U.S. (continental 48 states) to avoid map drift
+ax.set_xlim([-130, -60]) 
+ax.set_ylim([20, 55])   
+
+ax.set_aspect('equal')
+
+ax.set_axis_off()
+ax.set_title("Number of HHS Actions per Judicial District", fontsize=16, pad=20)
+
+plt.show()
+
 
 ```
 
