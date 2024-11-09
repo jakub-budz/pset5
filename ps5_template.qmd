@@ -31,12 +31,16 @@ execute:
 
 ```{python}
 import pandas as pd
+import geopandas as gpd
+import re
 import altair as alt
 import time
 from bs4 import BeautifulSoup
 import requests
 import warnings 
 import lxml
+from datetime import datetime
+import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 ```
 
@@ -65,15 +69,15 @@ data = []
 actions = soup.find_all(
     'li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
 for action in actions:
-# Title
+    # Title
     title_tag = action.find('h2', class_='usa-card__heading')
     title = title_tag.get_text(strip=True) if title_tag else None
 # Date
     date_tag = action.find('span', class_='text-base-dark')
     date = date_tag.get_text(strip=True) if date_tag else None
 # Category
-    category_tag = action.find(
-        'li', class_='display-inline-block usa-tag text-no-lowercase text-base-darkest bg-base-lightest margin-right-1')
+    category_tag = action.find('li',
+                               class_='display-inline-block usa-tag text-no-lowercase text-base-darkest bg-base-lightest margin-right-1')
     category = category_tag.get_text(strip=True) if category_tag else None
 # Link
     link = title_tag.find(
@@ -95,20 +99,32 @@ print(oig_data.head())
 ```{python}
 # Define function that captures Agency names
 # Attribution: ChatGPT assisted with the text stripping
+# Attribution 2: The original function did not work or would time
+# out for the larger dataframe, so I used ChatGPT to make it faster
 # Also used StackOverflow for general guidance:
 # https://stackoverflow.com/questions/68076739/
 # creating-a-function-for-my-python-web-scraper-that-will-output-a-dictionary
-def retrieve_agency(link):
-    response = requests.get(link)
-    soup = BeautifulSoup(response.text, 'lxml')
-    li_tags = soup.find_all('li')
 
-    for li in li_tags:
-        span_tag = li.find('span', class_='padding-right-2 text-base')
-        if span_tag and span_tag.text.strip() == "Agency:":
-            agency_name = li.get_text(
-                strip=True).replace("Agency:", "").strip()
-            return agency_name
+session = requests.Session()
+
+
+def retrieve_agency(link):
+    try:
+        # Set a timeout and use session for connection pooling
+        response = session.get(link, timeout=5)  # Set timeout as needed
+        soup = BeautifulSoup(response.text, 'lxml')
+        li_tags = soup.find_all('li')
+
+        for li in li_tags:
+            span_tag = li.find('span', class_='padding-right-2 text-base')
+            if span_tag and span_tag.text.strip() == "Agency:":
+                agency_name = li.get_text(
+                    strip=True).replace("Agency:", "").strip()
+                return agency_name
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+        return None
+
 
 oig_data['Agency Name'] = oig_data['Link'].apply(lambda x: retrieve_agency(x))
 print(oig_data.head())
@@ -164,8 +180,6 @@ def scraper_year_check(month, year):
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
-from datetime import datetime
-
 def scraper_year_check(month, year):
     if year < 2013:
         print("Year must be 2013 or later. Please enter a valid year.")
@@ -186,8 +200,10 @@ def scraper_year_check(month, year):
         data_found = False
 
         for li in li_tags:
-            date_text = li.find('span', class_="text-base-dark padding-right-105").get_text(
-                strip=True) if li.find('span', class_='text-base-dark padding-right-105') else None
+            date_text = li.find('span', class_="text-base-dark padding-right-105"
+                                ).get_text(
+                strip=True) if li.find('span',
+                                       class_='text-base-dark padding-right-105') else None
 
             if date_text:
                 date_object = datetime.strptime(date_text, "%B %d, %Y")
@@ -202,9 +218,12 @@ def scraper_year_check(month, year):
                 data_found = True
 
                 title = li.find(
-                    'h2', class_="usa-card__heading").get_text(strip=True) if li.find('h2') else None
-                category = li.find('li', class_='display-inline-block').get_text(
-                    strip=True) if li.find('li', class_='display-inline-block') else None
+                    'h2', class_="usa-card__heading"
+                ).get_text(strip=True) if li.find('h2') else None
+                category = li.find('li', class_='display-inline-block'
+                                   ).get_text(
+                    strip=True) if li.find('li', class_='display-inline-block'
+                                           ) else None
                 link = li.find('a')['href'] if li.find('a') else None
                 if link and not link.startswith("http"):
                     link = "https://oig.hhs.gov" + link
@@ -223,7 +242,13 @@ def scraper_year_check(month, year):
 
         current_page += 1
 
+
 scraper_year_check(1, 2023)
+
+oig_2023 = pd.read_csv('enforcement_actions_2023_1.csv')
+print(f'There are {len(oig_2023)} observations since 2021.')
+oig_2023['Date'] = pd.to_datetime(oig_2023['Date'])
+print(oig_2023.loc[oig_2023['Date'].idxmin()])
 ```
 
 * c. Test Partner's Code (PARTNER 1)
@@ -231,7 +256,8 @@ scraper_year_check(1, 2023)
 ```{python}
 scraper_year_check(1, 2021)
 oig_2021 = pd.read_csv('enforcement_actions_2021_1.csv')
-oig_2021['Agency Name'] = oig_2021['Link'].apply(lambda x: retrieve_agency(x))
+oig_2021['Agency_Name'] = oig_2021['Link'].apply(lambda x: retrieve_agency(x))
+
 print(f'There are {len(oig_2021)} observations since 2021.')
 oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
 print(oig_2021.loc[oig_2021['Date'].idxmin()])
@@ -242,51 +268,221 @@ print(oig_2021.loc[oig_2021['Date'].idxmin()])
 ### 1. Plot the number of enforcement actions over time (PARTNER 2)
 
 ```{python}
+import numpy as np
 
+oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
+
+oig_2021_summary = oig_2021.groupby(oig_2021['Date'].dt.to_period('M')).size(
+
+).reset_index(name='Count')
+
+# Convert the 'Date' column back to datetime format
+oig_2021_summary['Date'] = oig_2021_summary['Date'].dt.to_timestamp()
+
+enf_actions = alt.Chart(oig_2021_summary).mark_line().encode(
+    x=alt.X('Date:T', axis=alt.Axis(format='%Y-%m', title='Date',
+                                    labelAngle=-45)),
+    y=alt.Y('Count:Q', title='Count of Enforcement Actions')
+).properties(title="Monthly HHS Enforcement Actions from 2021 Onwards")
+
+enf_actions.save('enf_actions.png')
 ```
+
+![Enforcement Actions](enf_actions.png)
 
 ### 2. Plot the number of enforcement actions categorized: (PARTNER 1)
 
 * based on "Criminal and Civil Actions" vs. "State Enforcement Agencies"
 
 ```{python}
+# Filter df
+crim_civ = oig_2021[oig_2021["Category"] == "Criminal and Civil Actions"]
+# Assign keywords
+health_keywords = ["health", "medical", "doctor", "medicaid", "healthcare",
+                   "nurse", "pharmacy", "hospital", "provider", 'care',
+                   'psychiatrist']
+financial_keywords = ["finance", "bank", "money laundering", "tax",
+                      "accounting",
+                      "fraud", "false claims", "falsely claimed",
+                      "embezzlement", 'billing']
+drug_keywords = ["drug", "narcotics", "opioid",
+                 "pharmaceutical", "DEA", "substance", "physician"]
+bribery_keywords = ["bribery", "corruption", "kickback", "fraudulent"]
+other_keywords = []
+# Function to apply keywords
 
+
+def assign_topic(agency_name):
+    if agency_name is None:
+        return "Other"
+    agency_name = agency_name.lower().strip()
+    if any(keyword in agency_name for keyword in health_keywords):
+        return "Health Care Fraud"
+    elif any(keyword in agency_name for keyword in drug_keywords):
+        return "Drug Enforcement"
+    elif any(keyword in agency_name for keyword in bribery_keywords):
+        return "Bribery/Corruption"
+    if any(keyword in agency_name for keyword in financial_keywords):
+        return "Financial Fraud"
+    else:
+        return "Other"
+
+
+# Apply function to df
+crim_civ['Topic'] = crim_civ['Title'].apply(assign_topic)
 ```
+
+
+```{python}
+
+cca_agency = crim_civ['Agency_Name'].value_counts().reset_index()
+
+cca_agency_chart = alt.Chart(cca_agency).mark_line(point=True).encode(
+    x=alt.X('Agency_Name', sort='-y', title='Agency'),
+    y=alt.Y('count', title='Number of Criminal and Civil Actions')
+).configure_axis(
+    labelFontSize=8,
+    labelAngle=-45
+)
+cca_agency_chart.save('agency_chart.png')
+```
+
+![Criminal and Civil Actions](agency_chart.png)
 
 * based on five topics
 
 ```{python}
+cca_split = crim_civ['Topic'].value_counts().reset_index()
 
+cca_split_chart = alt.Chart(cca_split).mark_line(point=True).encode(
+    x=alt.X('Topic', sort='-y', title='Topic'),
+    y=alt.Y('count', title='Number of Actions')
+).configure_axis(
+    labelFontSize=8,
+    labelAngle=-45
+).properties(
+    title='Number of Actions per Topic',
+    width=500,
+    height=400
+).configure_axis(
+    labelAngle=-45,
+    labelFontSize=12  # Set axis label font size for readability
+)
+
+cca_split_chart.save('split_chart.png')
 ```
+
+![Criminal and Civil Actions Topics](split_chart.png)
 
 ## Step 4: Create maps of enforcement activity
 
 ### 1. Map by State (PARTNER 1)
 
 ```{python}
-
+state_level = oig_2021[oig_2021['Agency_Name'].str.contains(r'\bstate of\b',
+                                                            case=False, na=False)]
+state_level['State'] = state_level['Agency_Name'].str.replace(r'\bstate of\b ',
+                                                              '', case=False, regex=True)
+state_counts = state_level.groupby('State').size().reset_index(name='Count')
+state_data = gpd.read_file(
+    "/Users/jakub/Downloads/cb_2018_us_state_500k/cb_2018_us_state_500k.shp")
+merged_state = state_counts.merge(
+    state_data, left_on="State", right_on="NAME", how='left')
+merged_state = gpd.GeoDataFrame(merged_state, geometry="geometry")
 ```
 
+```{python}
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+merged_state.plot(
+    column="Count",
+    cmap="RdBu",
+    linewidth=0.8,
+    ax=ax,
+    legend=True,
+    legend_kwds={"shrink": 0.5, "orientation": "vertical"},
+    missing_kwds={'color': 'lightgrey'}
+)
+ax.set_xlim([-130, -60])
+ax.set_ylim([20, 55])
+ax.set_aspect('equal')
+ax.set_axis_off()
+ax.set_title("Number of Actions per State", fontsize=16, pad=20)
+plt.savefig('state_actions.png', format='png')
+plt.close()
+```
+
+![Actions per State](state_actions.png)
 
 ### 2. Map by District (PARTNER 2)
 
-```{python}
+Among actions taken by US Attorney District-level agencies, clean the district names so that you can merge them with the shapefile, and then plot a choropleth of the number of enforcement actions in each US Attorney District.
+Hint: look for “District” in the agency info.
 
+(We need to take the oig_2021 data and subset it to actions taken by US Attorney District level agencies only. Then clean the names and plot them with the shapefile data.)
+
+```{python}
+import geopandas as gpd
+import re
+
+oig_2021_district = oig_2021[oig_2021['Agency_Name'].str.contains(
+    'District', na=False)]
+district_data = gpd.read_file(
+    "/Users/jakub/Downloads/US Attorney Districts Shapefile simplified_20241109/geo_export_71ca049c-f059-4033-a997-a988d1e22c29.shp")
+district_data.head()
+
+# Attribution: Used ChatGPT for help to clean the data. Searched for "how to
+# clean text string so that it removes all text before a specified symbol such
+# as a comma or colon". Used the split() function to do this
+
+
+def clean_agency(agency_name):
+    parts = re.split(r'[,:;]', agency_name)
+    return parts[-1].strip() if parts else agency_name
+
+
+oig_2021_district['Agency_Name'] = oig_2021_district['Agency_Name'].apply(
+    clean_agency)
+
+# Need to group the data by district:
+
+district_counts = oig_2021_district.groupby(
+    'Agency_Name').size().reset_index(name="Action Count")
+
+# Now we merge the district data with the shapefile:
+
+merged_districts = district_counts.merge(
+    district_data, left_on="Agency_Name", right_on="judicial_d", how='left')
+merged_districts = gpd.GeoDataFrame(merged_districts, geometry="geometry")
 ```
 
-## Extra Credit
+Finally we can plot the choropleth:
 
-### 1. Merge zip code shapefile with population
 ```{python}
 
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+
+merged_districts.plot(
+    column="Action Count", cmap="Blues", linewidth=0.8, ax=ax, legend=True,
+    legend_kwds={
+        "shrink": 0.5,
+        "orientation": "vertical"
+    }
+)
+
+# Set xlim and ylim to focus on the contiguous U.S. (continental 48 states)
+# to avoid map drift
+ax.set_xlim([-130, -60])
+ax.set_ylim([20, 55])
+
+ax.set_aspect('equal')
+
+ax.set_axis_off()
+ax.set_title("Number of HHS Actions per Judicial District",
+             fontsize=16, pad=20)
+plt.savefig('district_actions.png', format='png')
+plt.close()
 ```
 
-### 2. Conduct spatial join
-```{python}
-
-```
-
-### 3. Map the action ratio in each district
-```{python}
-
-```
+![Actions per District](district_actions.png)
