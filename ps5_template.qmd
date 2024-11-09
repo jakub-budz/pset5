@@ -233,15 +233,16 @@ scraper_year_check(1, 2023)
 scraper_year_check(1, 2021)
 oig_2021 = pd.read_csv('enforcement_actions_2021_1.csv')
 
-'''
 oig_2021['Agency Name'] = oig_2021['Link'].apply(lambda x: retrieve_agency(x))
 print(f'There are {len(oig_2021)} observations since 2021.')
 oig_2021['Date'] = pd.to_datetime(oig_2021['Date'])
 print(oig_2021.loc[oig_2021['Date'].idxmin()])
-'''
+
 ```
 
 ```{python}
+
+#Note: This code does the same thing as the above chunk but should run faster
 
 #Attribution: Used ChatGPT to figure out how to speed up the original code, since retrieve_agency was taking incredibly long. ChatGPT suggested using an asynchronous function with these associated packages, as well as turning off SSL checks (this is public non-sensitive data so should be OK.)
 
@@ -261,7 +262,7 @@ ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
 async def retrieve_agency_async(session, link):
-    async with session.get(link, ssl=ssl_context) as response:  # Disabling SSL verification here
+    async with session.get(link, ssl=ssl_context) as response:  
         html = await response.text()
         soup = BeautifulSoup(html, 'lxml')
         li_tags = soup.find_all('li')
@@ -280,7 +281,7 @@ async def fetch_all_agencies(links):
         return await asyncio.gather(*tasks)
 
 # Use the asynchronous function in place of the original apply
-links = oig_2021['Link'].unique()  # Only unique links to avoid redundancy
+links = oig_2021['Link'].unique() 
 agency_names = asyncio.run(fetch_all_agencies(links))
 
 # Create a dictionary to map links to agency names for faster lookup
@@ -377,21 +378,6 @@ merged_districts = gpd.GeoDataFrame(merged_districts, geometry="geometry")
 
 Finally we can plot the choropleth:
 
-```{python}
-import matplotlib.pyplot as plt
-
-
-fig, ax = plt.subplots(1, 1, figsize=(30, 25))
-merged_districts.plot(column="Action Count", cmap="Blues", legend=True, linewidth=0.8, edgecolor="0.8", ax=ax, legend_kwds={"shrink": 0.5})
-ax.set_axis_off()
-ax.set_aspect('equal')
-
-ax.set_title("Number of Actions per Judicial District", fontsize=16, pad=20)
-
-plt.show()
-
-``` 
-
 
 ```{python}
 
@@ -399,15 +385,8 @@ import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots(1, 1, figsize=(15, 10))
 
-# Plot with adjusted legend settings
 merged_districts.plot(
-    column="Action Count",
-    cmap="Blues",
-    linewidth=0.8,
-    edgecolor="0.8",
-    ax=ax,
-    legend=True,
-    legend_kwds={
+    column="Action Count", cmap="Blues", linewidth=0.8, ax=ax,legend=True,legend_kwds={
         "shrink": 0.5,       
         "orientation": "vertical"
     }
